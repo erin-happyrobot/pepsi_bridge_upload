@@ -129,20 +129,31 @@ async def root():
         timestamp=datetime.utcnow().isoformat()
     )
 
-# @app.get("/health", response_model=HealthResponse)
-# async def health_check():
-#     """Health check endpoint for Railway monitoring"""
-#     import time
-#     start_time = os.getenv('START_TIME')
-#     if start_time:
-#         uptime = time.time() - float(start_time)
-#     else:
-#         uptime = 0.0
-#     return HealthResponse(
-#         status="healthy",
-#         uptime=uptime,
-#         timestamp=datetime.utcnow().isoformat()
-#     )
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint for Railway monitoring"""
+    try:
+        import time
+        start_time = os.getenv('START_TIME')
+        if start_time:
+            uptime = time.time() - float(start_time)
+        else:
+            uptime = 0.0
+        
+        logger.info(f"Health check requested - uptime: {uptime}")
+        
+        return HealthResponse(
+            status="healthy",
+            uptime=uptime,
+            timestamp=datetime.utcnow().isoformat()
+        )
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return HealthResponse(
+            status="unhealthy",
+            uptime=0.0,
+            timestamp=datetime.utcnow().isoformat()
+        )
 
 @app.get("/test")
 async def test_endpoint():
@@ -285,10 +296,12 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
+    # Use PORT environment variable for Railway deployment
+    port = int(os.getenv("PORT", settings.port))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=settings.port,
+        port=port,
         reload=settings.environment == "development"
     )
 
@@ -643,5 +656,3 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
 #     upload_to_supabase(happyrobot_loads)
 
 
-if __name__ == "__main__":
-    print("Server is running")
