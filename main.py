@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 # Initialize Supabase client (will be created in test endpoint)
 supabase: Client = None
 
+
 # Settings
 class Settings(BaseSettings):
     app_name: str = "Bridge Load Upload Server"
@@ -36,12 +37,17 @@ class Settings(BaseSettings):
     allowed_origins: str = "*"
     max_file_size: int = 10 * 1024 * 1024  # 10MB
     allowed_file_types: List[str] = [
-        "image/jpeg", "image/jpg", "image/png", "image/gif",
-        "application/pdf", "application/msword", 
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+        "application/pdf",
+        "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.ms-excel",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "text/csv", "text/plain"
+        "text/csv",
+        "text/plain",
     ]
     # Supabase settings
     supabase_url: Optional[str] = None
@@ -49,10 +55,11 @@ class Settings(BaseSettings):
     base_url: Optional[str] = None
     api_key_bridge_load_upload: Optional[str] = None
     org_id: Optional[str] = None
-    
+
     class Config:
         env_file = ".env"
         extra = "ignore"  # Ignore extra environment variables
+
 
 settings = Settings()
 
@@ -63,7 +70,7 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title=settings.app_name,
     version=settings.version,
-    description="A Python FastAPI server for file uploads, optimized for Railway deployment"
+    description="A Python FastAPI server for file uploads, optimized for Railway deployment",
 )
 
 # Add rate limiter
@@ -71,7 +78,9 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware
-origins = settings.allowed_origins.split(",") if settings.allowed_origins != "*" else ["*"]
+origins = (
+    settings.allowed_origins.split(",") if settings.allowed_origins != "*" else ["*"]
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -81,10 +90,8 @@ app.add_middleware(
 )
 
 # Trusted host middleware
-app.add_middleware(
-    TrustedHostMiddleware, 
-    allowed_hosts=["*"]
-)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
+
 
 # Pydantic models
 class ServerInfo(BaseModel):
@@ -93,10 +100,12 @@ class ServerInfo(BaseModel):
     status: str
     timestamp: str
 
+
 class HealthResponse(BaseModel):
     status: str
     uptime: float
     timestamp: str
+
 
 class FileInfo(BaseModel):
     original_name: str
@@ -104,19 +113,23 @@ class FileInfo(BaseModel):
     size: int
     uploaded_at: str
 
+
 class UploadResponse(BaseModel):
     message: str
     file: Optional[FileInfo] = None
     files: Optional[List[FileInfo]] = None
+
 
 # Utility functions
 def validate_file_type(file: UploadFile) -> bool:
     """Validate if file type is allowed"""
     return file.content_type in settings.allowed_file_types
 
+
 def validate_file_size(file: UploadFile) -> bool:
     """Validate if file size is within limits"""
     return file.size <= settings.max_file_size
+
 
 # Routes
 @app.get("/", response_model=ServerInfo)
@@ -126,60 +139,57 @@ async def root():
         message=settings.app_name,
         version=settings.version,
         status="running",
-        timestamp=datetime.utcnow().isoformat()
+        timestamp=datetime.utcnow().isoformat(),
     )
+
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint for Railway monitoring"""
     try:
         import time
-        start_time = os.getenv('START_TIME')
+
+        start_time = os.getenv("START_TIME")
         if start_time:
             uptime = time.time() - float(start_time)
         else:
             uptime = 0.0
-        
+
         logger.info(f"Health check requested - uptime: {uptime}")
-        
+
         return HealthResponse(
-            status="healthy",
-            uptime=uptime,
-            timestamp=datetime.utcnow().isoformat()
+            status="healthy", uptime=uptime, timestamp=datetime.utcnow().isoformat()
         )
     except Exception as e:
         logger.error(f"Health check error: {e}")
         return HealthResponse(
-            status="unhealthy",
-            uptime=0.0,
-            timestamp=datetime.utcnow().isoformat()
+            status="unhealthy", uptime=0.0, timestamp=datetime.utcnow().isoformat()
         )
+
 
 @app.get("/api/health", response_model=HealthResponse)
 async def api_health_check():
     """API health check endpoint for external monitoring services"""
     try:
         import time
-        start_time = os.getenv('START_TIME')
+
+        start_time = os.getenv("START_TIME")
         if start_time:
             uptime = time.time() - float(start_time)
         else:
             uptime = 0.0
-        
+
         logger.info(f"API health check requested - uptime: {uptime}")
-        
+
         return HealthResponse(
-            status="healthy",
-            uptime=uptime,
-            timestamp=datetime.utcnow().isoformat()
+            status="healthy", uptime=uptime, timestamp=datetime.utcnow().isoformat()
         )
     except Exception as e:
         logger.error(f"API health check error: {e}")
         return HealthResponse(
-            status="unhealthy",
-            uptime=0.0,
-            timestamp=datetime.utcnow().isoformat()
+            status="unhealthy", uptime=0.0, timestamp=datetime.utcnow().isoformat()
         )
+
 
 @app.get("/test")
 async def test_endpoint():
@@ -187,8 +197,9 @@ async def test_endpoint():
     try:
         # Load environment variables
         from dotenv import load_dotenv
+
         load_dotenv()
-        
+
         # Test Supabase connection
         # Check environment and use appropriate credentials
         environment = os.getenv("ENVIRONMENT", "production")
@@ -200,106 +211,52 @@ async def test_endpoint():
             supabase_url = os.getenv("SUPABASE_URL")
             supabase_key = os.getenv("SUPABASE_KEY")
             print("Using PRODUCTION Supabase credentials")
-        
+
         if not supabase_url or not supabase_key:
             return {
                 "message": "Environment variables not set",
                 "org_id": "01970f4c-c79d-7858-8034-60a265d687e4",
                 "error": f"Supabase credentials not found in environment (ENVIRONMENT={environment})",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
-        
+
         test_supabase = create_client(supabase_url, supabase_key)
-        
+
         # Test query to get loads for the specific ORG_ID
         org_id = "01970f4c-c79d-7858-8034-60a265d687e4"
-        
-        result = test_supabase.table("loads").select("id,custom_load_id,status").eq("org_id", org_id).limit(5).execute()
-        
+
+        result = (
+            test_supabase.table("loads")
+            .select("id,custom_load_id,status")
+            .eq("org_id", org_id)
+            .limit(5)
+            .execute()
+        )
+
         return {
             "message": "Test endpoint working",
             "org_id": org_id,
             "supabase_connection": "success",
             "sample_loads": result.data,
             "total_loads_found": len(result.data),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-        
+
     except Exception as e:
         logger.error(f"Test endpoint error: {str(e)}")
         return {
             "message": "Test endpoint error",
             "org_id": "01970f4c-c79d-7858-8034-60a265d687e4",
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
-
-@app.post("/upload-multiple", response_model=UploadResponse)
-@limiter.limit("5/minute")
-async def upload_multiple_files(
-    request,
-    files: List[UploadFile] = File(...)
-):
-    """Upload multiple files (max 5)"""
-    try:
-        if len(files) > 5:
-            raise HTTPException(
-                status_code=400, 
-                detail="Too many files. Maximum 5 files allowed."
-            )
-        
-        if not files:
-            raise HTTPException(status_code=400, detail="No files uploaded")
-        
-        files_info = []
-        
-        for file in files:
-            # Validate file
-            if not validate_file_type(file):
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"Invalid file type for {file.filename}. Only images, documents, and text files are allowed."
-                )
-            
-            if not validate_file_size(file):
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"File {file.filename} too large. Maximum size is {settings.max_file_size} bytes."
-                )
-            
-            # Read file content
-            content = await file.read()
-            
-            # Create file info
-            file_info = FileInfo(
-                original_name=file.filename,
-                mimetype=file.content_type,
-                size=len(content),
-                uploaded_at=datetime.utcnow().isoformat()
-            )
-            
-            files_info.append(file_info)
-            logger.info(f"File uploaded: {file.filename} ({len(content)} bytes)")
-        
-        return UploadResponse(
-            message=f"{len(files)} files uploaded successfully",
-            files=files_info
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Multiple upload error: {str(e)}")
-        raise HTTPException(status_code=500, detail="File upload failed")
 
 # Error handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"error": exc.detail}
-    )
+    return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
+
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
@@ -308,19 +265,26 @@ async def general_exception_handler(request, exc):
         status_code=500,
         content={
             "error": "Internal server error",
-            "message": "Something went wrong" if settings.environment == "production" else str(exc)
-        }
+            "message": (
+                "Something went wrong"
+                if settings.environment == "production"
+                else str(exc)
+            ),
+        },
     )
+
 
 # Startup event
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
     import time
-    os.environ['START_TIME'] = str(time.time())
+
+    os.environ["START_TIME"] = str(time.time())
     logger.info(f"Starting {settings.app_name} v{settings.version}")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Port: {settings.port}")
+
 
 # Shutdown event
 @app.on_event("shutdown")
@@ -328,64 +292,18 @@ async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info("Shutting down server")
 
+
 if __name__ == "__main__":
     import uvicorn
+
     # Use PORT environment variable for Railway deployment
     port = int(os.getenv("PORT", settings.port))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=port,
-        reload=settings.environment == "development"
+        reload=settings.environment == "development",
     )
-
-
-
-
-def parse_datetime(datetime_str):
-    """Parse datetime string and convert to ISO format"""
-    if not datetime_str or datetime_str.strip() == "":
-        return None
-
-    try:
-        # Parse format: "07/13/2025 14:00:00"
-        dt = datetime.strptime(datetime_str.strip(), "%m/%d/%Y %H:%M:%S")
-        # Do not convert to UTC; store as received
-        return dt.isoformat()
-    except ValueError:
-        return None
-
-
-def map_equipment_type(equipment_type, source_format="pepsi"):
-    """Map equipment types to standard format"""
-    if source_format == "pepsi":
-        equipment_mapping = {
-            "DRY VAN": "Dryvan",
-            "REEFER": "Reefer",
-            "FLATBED": "Flatbed",
-            "POWER ONLY": "Power only",
-            "STEP DECK": "Step deck",
-        }
-    else:  # happyrobot format
-        equipment_mapping = {
-            "Van": "Van",
-            "Dry Van": "Dryvan",
-            "Reefer": "Reefer",
-            "Flatbed": "Flatbed",
-            "Power Only": "Power only",
-            "Step Deck": "Step deck",
-        }
-    return equipment_mapping.get(equipment_type, "Van")
-
-
-def map_location_type(location_type):
-    """Map Pepsi location types to standard format"""
-    if "Pick" in location_type:
-        return "origin"
-    elif "Drop" in location_type:
-        return "destination"
-    else:
-        return "origin"  # default
 
 
 def normalize_field_names(data):
@@ -397,39 +315,55 @@ def normalize_field_names(data):
     else:
         return data
 
-def map_pepsi_to_happyrobot(happyrobot_load):
-    """Map HappyRobot load data to standard load format - handles one load at a time"""
 
+def transform_happyrobot_load(load):
+    """Transform unformatted HappyRobot load to standard format"""
     try:
         # Normalize field names to lowercase
-        happyrobot_load = normalize_field_names(happyrobot_load)
-        print("type of happyrobot_load", type(happyrobot_load))
-        print("happyrobot_load", happyrobot_load)
+        load = normalize_field_names(load)
 
-        # Parse appointment times
-        origin_appointment = happyrobot_load.get("origin_appointment_local", "")
-        destination_appointment = happyrobot_load.get("destination_appointment_local", "")
+        # Parse appointment times - remove microseconds
+        origin_appointment_local = load.get("origin_appointment_local", "")
+        origin_appointment_utc = load.get("origin_appointment_utc", "")
+        destination_appointment_local = load.get("destination_appointment_local", "")
+        destination_appointment_utc = load.get("destination_appointment_utc", "")
 
-        # Convert to ISO format (remove microseconds if present)
-        pickup_open = origin_appointment.replace(".000000000", "") if origin_appointment else None
-        pickup_close = pickup_open  # Same as open for now
-        delivery_open = destination_appointment.replace(".000000000", "") if destination_appointment else None
-        delivery_close = delivery_open  # Same as open for now
+        pickup_open = (
+            origin_appointment_local.replace(".000000000", "")
+            if origin_appointment_local
+            else None
+        )
+        pickup_open_utc = (
+            origin_appointment_utc.replace(".000000000", "")
+            if origin_appointment_utc
+            else None
+        )
+        delivery_open = (
+            destination_appointment_local.replace(".000000000", "")
+            if destination_appointment_local
+            else None
+        )
+        delivery_open_utc = (
+            destination_appointment_utc.replace(".000000000", "")
+            if destination_appointment_utc
+            else None
+        )
 
-        # Create origin location
+        # Create origin and destination objects
         origin = {
-            "city": happyrobot_load.get("origin_city", ""),
-            "state": happyrobot_load.get("origin_state_code", ""),
-            "zip": str(happyrobot_load.get("origin_postal_code", "")),
-            "country": "US"
+            "address_1": load.get("origin_address_1", ""),
+            "city": load.get("origin_city", ""),
+            "state": load.get("origin_state_code", ""),
+            "zip": str(load.get("origin_postal_code", "")),
+            "country": "US",
         }
 
-        # Create destination location
         destination = {
-            "city": happyrobot_load.get("destination_city", ""),
-            "state": happyrobot_load.get("destination_state_code", ""),
-            "zip": str(happyrobot_load.get("destination_postal_code", "")),
-            "country": "US"
+            "address_1": load.get("destination_address_1", ""),
+            "city": load.get("destination_city", ""),
+            "state": load.get("destination_state_code", ""),
+            "zip": str(load.get("destination_postal_code", "")),
+            "country": "US",
         }
 
         # Create stops array
@@ -438,133 +372,94 @@ def map_pepsi_to_happyrobot(happyrobot_load):
                 "type": "origin",
                 "location": origin,
                 "stop_timestamp_open": pickup_open,
-                "stop_timestamp_close": pickup_close,
-                "stop_order": 1
+                "stop_timestamp_close": pickup_open,  # Same as open for now
+                "stop_order": 1,
             },
             {
                 "type": "destination",
                 "location": destination,
                 "stop_timestamp_open": delivery_open,
-                "stop_timestamp_close": delivery_close,
-                "stop_order": 2
-            }
+                "stop_timestamp_close": delivery_open,  # Same as open for now
+                "stop_order": 2,
+            },
         ]
 
-        # Transform to match Supabase table schema
-        org_id = "01970f4c-c79d-7858-8034-60a265d687e4"
-        print(f"ORG_ID: {org_id}")
-        print(f"Transforming load: {happyrobot_load.get('custom_load_id')}")
-
+        # Create standard load object
         standard_load = {
-            "org_id": org_id,
-            "custom_load_id": happyrobot_load.get("custom_load_id"),
-            "equipment_type_name": happyrobot_load.get("equipment_type_name", "Van"),
-            "status": "available" if happyrobot_load.get("status", "").upper() == "OPEN" else "unavailable",
-            "posted_carrier_rate": happyrobot_load.get("posted_carrier_rate"),
-            "type": happyrobot_load.get("type", "owned").lower(),
-            "is_partial": False,  # Not provided in HappyRobot data
+            "org_id": "01970f4c-c79d-7858-8034-60a265d687e4",
+            "custom_load_id": load.get("custom_load_id"),
+            "equipment_type_name": load.get("equipment_type_name", "Van"),
+            "status": (
+                "available"
+                if load.get("status", "").upper() == "OPEN"
+                else "unavailable"
+            ),
+            "posted_carrier_rate": load.get("posted_carrier_rate"),
+            "type": load.get("type", "owned").lower(),
+            "is_partial": False,
             "origin": origin,
             "destination": destination,
             "stops": stops,
-            "max_buy": happyrobot_load.get("max_buy"),
+            "max_buy": load.get("max_buy"),
             "sale_notes": None,
-            "commodity_type": happyrobot_load.get("commodity_type", ""),
-            "weight": happyrobot_load.get("weight"),
-            "number_of_pieces": happyrobot_load.get("number_of_pieces"),
-            "miles": happyrobot_load.get("miles"),
-            "dimensions": None,  # Not provided in HappyRobot data
+            "commodity_type": load.get("commodity_type", ""),
+            "weight": load.get("weight"),
+            "number_of_pieces": load.get("number_of_pieces"),
+            "miles": load.get("miles"),
+            "dimensions": None,
             "pickup_date_open": pickup_open,
-            "pickup_date_close": pickup_close,
+            "pickup_date_close": pickup_open,
             "delivery_date_open": delivery_open,
-            "delivery_date_close": delivery_close,
-            "temp_configuration": None,  # Not provided in HappyRobot data
+            "delivery_date_close": delivery_open,
+            "temp_configuration": None,
             "min_temp": None,
             "max_temp": None,
             "is_temp_metric": False,
             "cargo_value": None,
-            "is_hazmat": False,  # Not provided in HappyRobot data
+            "is_hazmat": False,
             "is_owned": True,
         }
 
-        print(f"Final transformed load: {standard_load}")
         return standard_load
 
     except Exception as e:
-        print(f"Error mapping HappyRobot load to standard load: {e}")
+        print(f"Error transforming load: {e}")
         return None
-
-
-
-def process_csv_file(csv_file_path):
-    """Process the CSV file and convert Pepsi loads to happyrobot format"""
-    happyrobot_loads = []
-
-    # Group rows by ORDER_NBR
-    loads_by_order = defaultdict(list)
-
-    with open(csv_file_path, "r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-
-        for row_num, row in enumerate(reader, 1):
-            order_nbr = row.get("ORDER_NBR", "").strip()
-            if not order_nbr:
-                continue
-
-            loads_by_order[order_nbr].append(row)
-
-    # Process each load
-    for order_nbr, rows in loads_by_order.items():
-        try:
-            # Map to happyrobot format
-            print("rows")
-            happyrobot_loads_for_order = map_pepsi_to_happyrobot(rows)
-            happyrobot_loads.extend(happyrobot_loads_for_order)
-            print(f"Processed load {order_nbr} with {len(rows)} stops")
-
-        except Exception as e:
-            print(f"Error processing load {order_nbr}: {e}")
-            continue
-
-    return happyrobot_loads
 
 
 @app.post("/upload-to-supabase")
 def upload_to_supabase(happyrobot_loads: List[dict]):
     """Upload loads to Supabase after transforming from HappyRobot format"""
     if not happyrobot_loads:
-        # if there are no loads to upload, everything is unavailable
-        mark_all_loads_unavailable()
         print("No loads to upload")
-        return {"message": "No loads provided-- everything unavailable"}
+        return {"statusCode": 400, "body": json.dumps("No loads provided")}
 
-    # Normalize all field names to lowercase
-    happyrobot_loads = normalize_field_names(happyrobot_loads)
-    
-    # Transform loads from HappyRobot format to expected format
+    # Transform loads to standard format
     transformed_loads = []
     for load in happyrobot_loads:
         try:
-            transformed_load = map_pepsi_to_happyrobot(load)
-            transformed_loads.append(transformed_load)
+            transformed_load = transform_happyrobot_load(load)
+            if transformed_load:
+                transformed_loads.append(transformed_load)
         except Exception as e:
-            print(f"Error transforming load {load.get('custom_load_id', 'unknown')}: {e}")
+            print(
+                f"Error transforming load {load.get('custom_load_id', 'unknown')}: {e}"
+            )
             continue
 
     if not transformed_loads:
         print("No loads successfully transformed")
-        return {"message": "No loads successfully transformed"}
+        return {
+            "statusCode": 400,
+            "body": json.dumps("No loads successfully transformed"),
+        }
 
     # Filter out duplicates based on custom_load_id
     seen_load_ids = set()
     unique_loads = []
-    print("transformed_loads", transformed_loads)
-
-    
 
     for load in transformed_loads:
-        print("load", load)
         load_id = load.get("custom_load_id")
-        print("load_id", load_id)
         if load_id and load_id not in seen_load_ids:
             seen_load_ids.add(load_id)
             unique_loads.append(load)
@@ -573,120 +468,110 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
 
     if not unique_loads:
         print("No unique loads to upload after filtering duplicates")
-        return {"message": "No unique loads to upload after filtering duplicates"}
+        return {
+            "statusCode": 400,
+            "body": json.dumps("No unique loads to upload after filtering duplicates"),
+        }
 
     print(
-        f"Uploading {len(unique_loads)} unique loads one at a time (filtered out {len(transformed_loads) - len(unique_loads)} duplicates)"
+        f"Uploading {len(unique_loads)} unique loads (filtered out {len(transformed_loads) - len(unique_loads)} duplicates)"
     )
-
-    # unique loads is unique from upload
-    print("unique_loads", unique_loads)
-    unique_load_ids = [load["custom_load_id"] for load in unique_loads]
-    unique_loads_set = set(unique_load_ids)
-
-    print("unique_loads_set", unique_loads_set)
-
-    # Start from the beginning since this is a new file
-    start_index = 0
-    total_uploaded = 0
-    failed_loads = []
 
     try:
         # Load environment variables
         from dotenv import load_dotenv
+
         load_dotenv()
-        
+
         # Check environment and use appropriate credentials
         environment = os.getenv("ENVIRONMENT", "production")
         if environment.upper() == "DEV":
             supabase_url = os.getenv("SUPABASE_URL_TEST")
             supabase_key = os.getenv("SUPABASE_KEY_TEST")
-            print("Using TEST Supabase credentials for DEV environment")
+            print("Using TEST Supabase credentials")
         else:
             supabase_url = os.getenv("SUPABASE_URL")
             supabase_key = os.getenv("SUPABASE_KEY")
             print("Using PRODUCTION Supabase credentials")
-        
+
         if not supabase_url or not supabase_key:
             return {
                 "statusCode": 500,
-                "body": json.dumps(f"Supabase credentials not found in environment (ENVIRONMENT={environment})")
+                "body": json.dumps(
+                    f"Supabase credentials not found (ENVIRONMENT={environment})"
+                ),
             }
-        
+
         supabase = create_client(supabase_url, supabase_key)
 
-        # Get today's date in YYYY-MM-DD format
-        today = datetime.now().strftime("%Y-%m-%d")
-        # Add time component for proper comparison with ISO format
-        today_start = f"{today}T00:00:00Z"
-
+        # Get existing loads from Supabase that are currently available
+        org_id = "01970f4c-c79d-7858-8034-60a265d687e4"
         existing_loads = (
             supabase.table("loads")
             .select("custom_load_id")
-            # .gte("origin_appointment_local", today_start)
             .eq("status", "available")
-            .eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4")
+            .eq("org_id", org_id)
             .execute()
         )
 
-
         # Create a set of existing load IDs for quick lookup
         existing_load_ids = {load["custom_load_id"] for load in existing_loads.data}
-        print("existing_load_ids", existing_load_ids)
-        print(existing_loads.data)
+        print(f"Found {len(existing_load_ids)} existing available loads in database")
 
+        # Create a set of current load IDs from incoming request
+        current_load_ids = {load.get("custom_load_id") for load in unique_loads}
 
-        loads_to_update = existing_load_ids - unique_loads_set
-        print("loads_to_update", loads_to_update)
-        print(f"Loads present in DB but not in CSV: {loads_to_update}")
-        if loads_to_update and loads_to_update != set():
-            # Update status to "unavailable" for loads not in current response
-            update_result = (
-                supabase.table("loads")
-                .update({"status": "unavailable"})
-                .in_("custom_load_id", list(loads_to_update))
-                .eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4")
-                .execute()
+        # Find loads that exist in Supabase but not in current request
+        loads_to_mark_covered = existing_load_ids - current_load_ids
+
+        if loads_to_mark_covered:
+            # Update status to "covered" for loads not in current request
+            print(
+                f"Marking {len(loads_to_mark_covered)} loads as covered (not in current request)"
             )
-            print(f"Updated {len(loads_to_update)} loads to unavailable status")
+            supabase.table("loads").update({"status": "covered"}).in_(
+                "custom_load_id", list(loads_to_mark_covered)
+            ).eq("org_id", org_id).execute()
+            print(f"✓ Updated {len(loads_to_mark_covered)} loads to covered status")
 
-        # upsert loads one by one since we don't have the upsert_loads function
-        successful_uploads = 0
-        failed_uploads = 0
+        # Upload loads one at a time using rpc.upsert_loads
+        total_uploaded = 0
+        failed_loads = []
 
-        for load in unique_loads:
+        for i, load in enumerate(unique_loads, 1):
+            load_id = load.get("custom_load_id", "unknown")
+            print(f"Uploading load {i}/{len(unique_loads)}: {load_id}")
+
             try:
-                print(f"Uploading load {load['custom_load_id']}")
-                
-                # Try to insert first
-                result = supabase.table("loads").insert(load).execute()
-                successful_uploads += 1
-                print(f"Successfully inserted load {load['custom_load_id']}")
+                supabase.rpc("upsert_loads", {"_payload": [load]}).execute()
+                total_uploaded += 1
+                print(f"✓ Successfully uploaded load {load_id}")
+                time.sleep(0.5)  # Small delay between uploads
 
             except Exception as e:
-                # If insert fails, try to update
-                try:
-                    print(f"Insert failed for {load['custom_load_id']}, trying update: {str(e)}")
-                    print(f"Update data for {load['custom_load_id']}: status={load.get('status')}")
-                    # Update the load by custom_load_id only (regardless of current org_id)
-                    result = supabase.table("loads").update(load).eq("custom_load_id", load['custom_load_id']).execute()
-                    successful_uploads += 1
-                    print(f"Successfully updated load {load['custom_load_id']}")
-                    print(f"Update result: {result.data}")
-                except Exception as update_error:
-                    failed_uploads += 1
-                    print(f"Error uploading load {load['custom_load_id']}: {str(update_error)}")
-                    continue
+                print(f"✗ Failed to upload load {load_id}: {e}")
+                failed_loads.append({"load_id": load_id, "error": str(e)})
 
-        print(
-            f"Upload complete: {successful_uploads} successful, {failed_uploads} failed"
-        )
+        print(f"\nUpload Summary:")
+        print(f"Successfully uploaded: {total_uploaded} loads")
+        print(f"Failed uploads: {len(failed_loads)} loads")
+        print(f"Marked as covered: {len(loads_to_mark_covered)} loads")
+
+        if failed_loads:
+            print(f"\nFailed loads:")
+            for failed in failed_loads:
+                print(f"  - {failed['load_id']}: {failed['error']}")
 
         return {
             "statusCode": 200,
             "body": json.dumps(
-                f"Successfully processed {successful_uploads} loads, {failed_uploads} failed. "
-                f"Marked {len(loads_to_update)} loads as unavailable"
+                {
+                    "message": f"Successfully uploaded {total_uploaded} loads, {len(failed_loads)} failed, {len(loads_to_mark_covered)} marked as covered",
+                    "total_uploaded": total_uploaded,
+                    "failed_count": len(failed_loads),
+                    "covered_count": len(loads_to_mark_covered),
+                    "failed_loads": failed_loads,
+                }
             ),
         }
 
@@ -694,86 +579,5 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
         print(f"Error uploading to Supabase: {e}")
         return {
             "statusCode": 500,
-            "body": json.dumps(
-                f"Error uploading to Supabase: {e}"
-            ),
+            "body": json.dumps(f"Error uploading to Supabase: {e}"),
         }
-
-
-# def main():
-#     csv_file_path = (
-#         "test_loads.csv"  ## This is the only line that has to be edited Kabir
-#     )
-
-#     if not os.path.exists(csv_file_path):
-#         print(f"CSV file not found: {csv_file_path}")
-#         return
-
-#     print("Processing PepsiCo loads...")
-#     happyrobot_loads = process_csv_file(csv_file_path)
-
-#     print(f"\nProcessed {len(happyrobot_loads)} loads")
-
-#     # Save to JSON file for review
-#     with open("pepsi_loads_converted.json", "w") as f:
-#         json.dump(happyrobot_loads, f, indent=2)
-#     print("Saved converted loads to pepsi_loads_converted.json")
-
-#     # Upload to Supabase
-#     print("\nUploading to Supabase...")
-#     upload_to_supabase(happyrobot_loads)
-
-
-def mark_all_loads_unavailable():
-    try:
-        print("Marking all loads as unavailable")
-        # Load environment variables
-        from dotenv import load_dotenv
-        load_dotenv()
-        
-        # Check environment and use appropriate credentials
-        environment = os.getenv("ENVIRONMENT", "production")
-        if environment.upper() == "DEV":
-            supabase_url = os.getenv("SUPABASE_URL_TEST")
-            supabase_key = os.getenv("SUPABASE_KEY_TEST")
-            print("Using TEST Supabase credentials for DEV environment")
-        else:
-            supabase_url = os.getenv("SUPABASE_URL")
-            supabase_key = os.getenv("SUPABASE_KEY")
-            print("Using PRODUCTION Supabase credentials")
-        
-        if not supabase_url or not supabase_key:
-            return {
-                "statusCode": 500,
-                "body": json.dumps(f"Supabase credentials not found in environment (ENVIRONMENT={environment})")
-            }
-        
-        supabase = create_client(supabase_url, supabase_key)
-
-
-        existing_loads = (
-            supabase.table("loads")
-            .select("custom_load_id")
-            .eq("status", "available")
-            .eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4")
-            .execute()
-        )
-        print("existing_loads data=", existing_loads.data)
-        
-        if existing_loads.data and len(existing_loads.data) > 0:
-            # Extract just the load IDs from the response
-            existing_load_ids = [load["custom_load_id"] for load in existing_loads.data]
-            print("existing_load_ids", existing_load_ids)
-            
-            # Update status to "unavailable" for all available loads
-            update_result = (
-                supabase.table("loads")
-                .update({"status": "unavailable"})
-                .in_("custom_load_id", existing_load_ids)
-                .eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4")
-                .execute()
-            )
-            print(f"Updated {len(existing_load_ids)} loads to unavailable status")
-    except Exception as e:
-        print(f"Error marking all loads as unavailable: {e}")
-        return
