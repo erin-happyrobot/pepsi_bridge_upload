@@ -505,10 +505,10 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
             print(
                 f"Marking {len(loads_to_mark_covered)} loads as covered (not in current request)"
             )
-            supabase.table("loads").update({"status": "covered"}).in_(
+            supabase.table("loads").update({"status": "unavailable"}).in_(
                 "custom_load_id", list(loads_to_mark_covered)
             ).eq("org_id", org_id).execute()
-            print(f"✓ Updated {len(loads_to_mark_covered)} loads to covered status")
+            print(f"✓ Updated {len(loads_to_mark_covered)} loads to unavailable status")
 
         # Upload loads one at a time using rpc.upsert_loads
         total_uploaded = 0
