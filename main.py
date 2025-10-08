@@ -658,7 +658,8 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
                 try:
                     print(f"Insert failed for {load['custom_load_id']}, trying update: {str(e)}")
                     print(f"Update data for {load['custom_load_id']}: status={load.get('status')}")
-                    result = supabase.table("loads").update(load).eq("custom_load_id", load['custom_load_id']).eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4").execute()
+                    # Update the load by custom_load_id only (regardless of current org_id)
+                    result = supabase.table("loads").update(load).eq("custom_load_id", load['custom_load_id']).execute()
                     successful_uploads += 1
                     print(f"Successfully updated load {load['custom_load_id']}")
                     print(f"Update result: {result.data}")
