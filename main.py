@@ -190,14 +190,22 @@ async def test_endpoint():
         load_dotenv()
         
         # Test Supabase connection
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_KEY")
+        # Check environment and use appropriate credentials
+        environment = os.getenv("ENVIRONMENT", "production")
+        if environment.upper() == "DEV":
+            supabase_url = os.getenv("SUPABASE_URL_TEST")
+            supabase_key = os.getenv("SUPABASE_KEY_TEST")
+            print("Using TEST Supabase credentials for DEV environment")
+        else:
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_key = os.getenv("SUPABASE_KEY")
+            print("Using PRODUCTION Supabase credentials")
         
         if not supabase_url or not supabase_key:
             return {
                 "message": "Environment variables not set",
                 "org_id": "01970f4c-c79d-7858-8034-60a265d687e4",
-                "error": "SUPABASE_URL or SUPABASE_KEY not found in environment",
+                "error": f"Supabase credentials not found in environment (ENVIRONMENT={environment})",
                 "timestamp": datetime.utcnow().isoformat()
             }
         
@@ -573,13 +581,21 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
         from dotenv import load_dotenv
         load_dotenv()
         
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_KEY")
+        # Check environment and use appropriate credentials
+        environment = os.getenv("ENVIRONMENT", "production")
+        if environment.upper() == "DEV":
+            supabase_url = os.getenv("SUPABASE_URL_TEST")
+            supabase_key = os.getenv("SUPABASE_KEY_TEST")
+            print("Using TEST Supabase credentials for DEV environment")
+        else:
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_key = os.getenv("SUPABASE_KEY")
+            print("Using PRODUCTION Supabase credentials")
         
         if not supabase_url or not supabase_key:
             return {
                 "statusCode": 500,
-                "body": json.dumps("SUPABASE_URL or SUPABASE_KEY not found in environment")
+                "body": json.dumps(f"Supabase credentials not found in environment (ENVIRONMENT={environment})")
             }
         
         supabase = create_client(supabase_url, supabase_key)
@@ -695,13 +711,21 @@ def mark_all_loads_unavailable():
         from dotenv import load_dotenv
         load_dotenv()
         
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_KEY")
+        # Check environment and use appropriate credentials
+        environment = os.getenv("ENVIRONMENT", "production")
+        if environment.upper() == "DEV":
+            supabase_url = os.getenv("SUPABASE_URL_TEST")
+            supabase_key = os.getenv("SUPABASE_KEY_TEST")
+            print("Using TEST Supabase credentials for DEV environment")
+        else:
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_key = os.getenv("SUPABASE_KEY")
+            print("Using PRODUCTION Supabase credentials")
         
         if not supabase_url or not supabase_key:
             return {
                 "statusCode": 500,
-                "body": json.dumps("SUPABASE_URL or SUPABASE_KEY not found in environment")
+                "body": json.dumps(f"Supabase credentials not found in environment (ENVIRONMENT={environment})")
             }
         
         supabase = create_client(supabase_url, supabase_key)
