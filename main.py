@@ -509,8 +509,10 @@ def process_csv_file(csv_file_path):
 def upload_to_supabase(happyrobot_loads: List[dict]):
     """Upload loads to Supabase after transforming from HappyRobot format"""
     if not happyrobot_loads:
+        # if there are no loads to upload, everything is unavailable
+        mark_all_loads_unavailable()
         print("No loads to upload")
-        return {"message": "No loads provided"}
+        return {"message": "No loads provided-- everything unavailable"}
 
     # Normalize all field names to lowercase
     happyrobot_loads = normalize_field_names(happyrobot_loads)
@@ -686,3 +688,46 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
 #     upload_to_supabase(happyrobot_loads)
 
 
+def mark_all_loads_unavailable():
+    try:
+        print("Marking all loads as unavailable")
+        # Load environment variables
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_KEY")
+        
+        if not supabase_url or not supabase_key:
+            return {
+                "statusCode": 500,
+                "body": json.dumps("SUPABASE_URL or SUPABASE_KEY not found in environment")
+            }
+        
+        supabase = create_client(supabase_url, supabase_key)
+
+
+        existing_loads = (
+            supabase.table("loads")
+            .select("custom_load_id")
+            .eq("status", "available")
+            .execute()
+        )
+        print("existing_loads data=", existing_loads.data)
+        
+        if existing_loads.data and len(existing_loads.data) > 0:
+            # Extract just the load IDs from the response
+            existing_load_ids = [load["custom_load_id"] for load in existing_loads.data]
+            print("existing_load_ids", existing_load_ids)
+            
+            # Update status to "unavailable" for all available loads
+            update_result = (
+                supabase.table("loads")
+                .update({"status": "unavailable"})
+                .in_("custom_load_id", existing_load_ids)
+                .execute()
+            )
+            print(f"Updated {len(existing_load_ids)} loads to unavailable status")
+    except Exception as e:
+        print(f"Error marking all loads as unavailable: {e}")
+        return
