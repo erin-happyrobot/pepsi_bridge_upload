@@ -399,84 +399,93 @@ def normalize_field_names(data):
 
 def map_pepsi_to_happyrobot(happyrobot_load):
     """Map HappyRobot load data to standard load format - handles one load at a time"""
-    
+
     try:
         # Normalize field names to lowercase
         happyrobot_load = normalize_field_names(happyrobot_load)
         print("type of happyrobot_load", type(happyrobot_load))
         print("happyrobot_load", happyrobot_load)
-        
+
         # Parse appointment times
         origin_appointment = happyrobot_load.get("origin_appointment_local", "")
         destination_appointment = happyrobot_load.get("destination_appointment_local", "")
-        
+
         # Convert to ISO format (remove microseconds if present)
         pickup_open = origin_appointment.replace(".000000000", "") if origin_appointment else None
-        pickup_close = pickup_open  # Add 2 hours if needed
+        pickup_close = pickup_open  # Same as open for now
         delivery_open = destination_appointment.replace(".000000000", "") if destination_appointment else None
-        delivery_close = delivery_open  # Add 2 hours if needed
-        
-        # Create stops
+        delivery_close = delivery_open  # Same as open for now
+
+        # Create origin location
+        origin = {
+            "city": happyrobot_load.get("origin_city", ""),
+            "state": happyrobot_load.get("origin_state_code", ""),
+            "zip": str(happyrobot_load.get("origin_postal_code", "")),
+            "country": "US"
+        }
+
+        # Create destination location
+        destination = {
+            "city": happyrobot_load.get("destination_city", ""),
+            "state": happyrobot_load.get("destination_state_code", ""),
+            "zip": str(happyrobot_load.get("destination_postal_code", "")),
+            "country": "US"
+        }
+
+        # Create stops array
         stops = [
             {
                 "type": "origin",
-                "location": {
-                    "city": happyrobot_load.get("origin_city", ""),
-                    "state": happyrobot_load.get("origin_state_code", ""),
-                    "zip": str(happyrobot_load.get("origin_postal_code", "")),
-                    "country": "US"
-                },
+                "location": origin,
                 "stop_timestamp_open": pickup_open,
                 "stop_timestamp_close": pickup_close,
                 "stop_order": 1
             },
             {
                 "type": "destination",
-                "location": {
-                    "city": happyrobot_load.get("destination_city", ""),
-                    "state": happyrobot_load.get("destination_state_code", ""),
-                    "zip": str(happyrobot_load.get("destination_postal_code", "")),
-                    "country": "US"
-                },
+                "location": destination,
                 "stop_timestamp_open": delivery_open,
                 "stop_timestamp_close": delivery_close,
                 "stop_order": 2
             }
         ]
-        
-        # Transform to match your table schema (lowercase field names)
+
+        # Transform to match Supabase table schema
         org_id = "01970f4c-c79d-7858-8034-60a265d687e4"
-        print(f"ORG_ID from environment: {org_id}")
+        print(f"ORG_ID: {org_id}")
         print(f"Transforming load: {happyrobot_load.get('custom_load_id')}")
+
         standard_load = {
             "org_id": org_id,
             "custom_load_id": happyrobot_load.get("custom_load_id"),
             "equipment_type_name": happyrobot_load.get("equipment_type_name", "Van"),
             "status": "available" if happyrobot_load.get("status", "").upper() == "OPEN" else "unavailable",
             "posted_carrier_rate": happyrobot_load.get("posted_carrier_rate"),
+            "type": happyrobot_load.get("type", "owned").lower(),
+            "is_partial": False,  # Not provided in HappyRobot data
+            "origin": origin,
+            "destination": destination,
+            "stops": stops,
             "max_buy": happyrobot_load.get("max_buy"),
-            "type": happyrobot_load.get("type", "OWNED"),
+            "sale_notes": None,
+            "commodity_type": happyrobot_load.get("commodity_type", ""),
             "weight": happyrobot_load.get("weight"),
             "number_of_pieces": happyrobot_load.get("number_of_pieces"),
             "miles": happyrobot_load.get("miles"),
-            "commodity_type": happyrobot_load.get("commodity_type"),
-            "linehaul_rate": None,  # Not provided in HappyRobot data
-            "rate_per_mile": None,  # Not provided in HappyRobot data
-            "same_day_pickup": happyrobot_load.get("same_day_pickup"),
-            "origin_appointment_local": pickup_open,
-            "origin_appointment_utc": happyrobot_load.get("origin_appointment_utc", "").replace(".000000000", "") if happyrobot_load.get("origin_appointment_utc") else pickup_open,
-            "origin_address_1": happyrobot_load.get("origin_address_1"),
-            "origin_city": happyrobot_load.get("origin_city", ""),
-            "origin_state_code": happyrobot_load.get("origin_state_code", ""),
-            "origin_postal_code": str(happyrobot_load.get("origin_postal_code", "")),
-            "destination_appointment_local": delivery_open,
-            "destination_appointment_utc": happyrobot_load.get("destination_appointment_utc", "").replace(".000000000", "") if happyrobot_load.get("destination_appointment_utc") else delivery_open,
-            "destination_address_1": happyrobot_load.get("destination_address_1"),
-            "destination_city": happyrobot_load.get("destination_city", ""),
-            "destination_state_code": happyrobot_load.get("destination_state_code", ""),
-            "destination_postal_code": str(happyrobot_load.get("destination_postal_code", ""))
+            "dimensions": None,  # Not provided in HappyRobot data
+            "pickup_date_open": pickup_open,
+            "pickup_date_close": pickup_close,
+            "delivery_date_open": delivery_open,
+            "delivery_date_close": delivery_close,
+            "temp_configuration": None,  # Not provided in HappyRobot data
+            "min_temp": None,
+            "max_temp": None,
+            "is_temp_metric": False,
+            "cargo_value": None,
+            "is_hazmat": False,  # Not provided in HappyRobot data
+            "is_owned": True,
         }
-        
+
         print(f"Final transformed load: {standard_load}")
         return standard_load
 
