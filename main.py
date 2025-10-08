@@ -459,18 +459,19 @@ def map_pepsi_to_happyrobot(happyrobot_load):
             "weight": happyrobot_load.get("weight"),
             "number_of_pieces": happyrobot_load.get("number_of_pieces"),
             "miles": happyrobot_load.get("miles"),
+            "commodity_type": happyrobot_load.get("commodity_type"),
             "linehaul_rate": None,  # Not provided in HappyRobot data
             "rate_per_mile": None,  # Not provided in HappyRobot data
-            "same_day_pickup": None,  # Not provided in HappyRobot data
+            "same_day_pickup": happyrobot_load.get("same_day_pickup"),
             "origin_appointment_local": pickup_open,
-            "origin_appointment_utc": pickup_open,  # Assuming same as local for now
-            "origin_address_1": None,  # Not provided in HappyRobot data
+            "origin_appointment_utc": happyrobot_load.get("origin_appointment_utc", "").replace(".000000000", "") if happyrobot_load.get("origin_appointment_utc") else pickup_open,
+            "origin_address_1": happyrobot_load.get("origin_address_1"),
             "origin_city": happyrobot_load.get("origin_city", ""),
             "origin_state_code": happyrobot_load.get("origin_state_code", ""),
             "origin_postal_code": str(happyrobot_load.get("origin_postal_code", "")),
             "destination_appointment_local": delivery_open,
-            "destination_appointment_utc": delivery_open,  # Assuming same as local for now
-            "destination_address_1": None,  # Not provided in HappyRobot data
+            "destination_appointment_utc": happyrobot_load.get("destination_appointment_utc", "").replace(".000000000", "") if happyrobot_load.get("destination_appointment_utc") else delivery_open,
+            "destination_address_1": happyrobot_load.get("destination_address_1"),
             "destination_city": happyrobot_load.get("destination_city", ""),
             "destination_state_code": happyrobot_load.get("destination_state_code", ""),
             "destination_postal_code": str(happyrobot_load.get("destination_postal_code", ""))
