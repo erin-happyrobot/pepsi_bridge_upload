@@ -155,6 +155,32 @@ async def health_check():
             timestamp=datetime.utcnow().isoformat()
         )
 
+@app.get("/api/health", response_model=HealthResponse)
+async def api_health_check():
+    """API health check endpoint for external monitoring services"""
+    try:
+        import time
+        start_time = os.getenv('START_TIME')
+        if start_time:
+            uptime = time.time() - float(start_time)
+        else:
+            uptime = 0.0
+        
+        logger.info(f"API health check requested - uptime: {uptime}")
+        
+        return HealthResponse(
+            status="healthy",
+            uptime=uptime,
+            timestamp=datetime.utcnow().isoformat()
+        )
+    except Exception as e:
+        logger.error(f"API health check error: {e}")
+        return HealthResponse(
+            status="unhealthy",
+            uptime=0.0,
+            timestamp=datetime.utcnow().isoformat()
+        )
+
 @app.get("/test")
 async def test_endpoint():
     """Test endpoint with ORG_ID"""
@@ -354,16 +380,27 @@ def map_location_type(location_type):
         return "origin"  # default
 
 
+def normalize_field_names(data):
+    """Convert all field names in a dictionary to lowercase"""
+    if isinstance(data, dict):
+        return {key.lower(): value for key, value in data.items()}
+    elif isinstance(data, list):
+        return [normalize_field_names(item) for item in data]
+    else:
+        return data
+
 def map_pepsi_to_happyrobot(happyrobot_load):
     """Map HappyRobot load data to standard load format - handles one load at a time"""
     
     try:
+        # Normalize field names to lowercase
+        happyrobot_load = normalize_field_names(happyrobot_load)
         print("type of happyrobot_load", type(happyrobot_load))
         print("happyrobot_load", happyrobot_load)
         
         # Parse appointment times
-        origin_appointment = happyrobot_load.get("ORIGIN_APPOINTMENT_LOCAL", "")
-        destination_appointment = happyrobot_load.get("DESTINATION_APPOINTMENT_LOCAL", "")
+        origin_appointment = happyrobot_load.get("origin_appointment_local", "")
+        destination_appointment = happyrobot_load.get("destination_appointment_local", "")
         
         # Convert to ISO format (remove microseconds if present)
         pickup_open = origin_appointment.replace(".000000000", "") if origin_appointment else None
@@ -376,9 +413,9 @@ def map_pepsi_to_happyrobot(happyrobot_load):
             {
                 "type": "origin",
                 "location": {
-                    "city": happyrobot_load.get("ORIGIN_CITY", ""),
-                    "state": happyrobot_load.get("ORIGIN_STATE_CODE", ""),
-                    "zip": str(happyrobot_load.get("ORIGIN_POSTAL_CODE", "")),
+                    "city": happyrobot_load.get("origin_city", ""),
+                    "state": happyrobot_load.get("origin_state_code", ""),
+                    "zip": str(happyrobot_load.get("origin_postal_code", "")),
                     "country": "US"
                 },
                 "stop_timestamp_open": pickup_open,
@@ -388,9 +425,9 @@ def map_pepsi_to_happyrobot(happyrobot_load):
             {
                 "type": "destination",
                 "location": {
-                    "city": happyrobot_load.get("DESTINATION_CITY", ""),
-                    "state": happyrobot_load.get("DESTINATION_STATE_CODE", ""),
-                    "zip": str(happyrobot_load.get("DESTINATION_POSTAL_CODE", "")),
+                    "city": happyrobot_load.get("destination_city", ""),
+                    "state": happyrobot_load.get("destination_state_code", ""),
+                    "zip": str(happyrobot_load.get("destination_postal_code", "")),
                     "country": "US"
                 },
                 "stop_timestamp_open": delivery_open,
@@ -399,48 +436,32 @@ def map_pepsi_to_happyrobot(happyrobot_load):
             }
         ]
         
-        # Transform to standard format
+        # Transform to match your table schema (lowercase field names)
         standard_load = {
-            "org_id": os.getenv("ORG_ID", "01970f4c-c79d-7858-8034-60a265d687e4"),
-            "custom_load_id": str(happyrobot_load.get("CUSTOM_LOAD_ID", "")),
-            "equipment_type_name": map_equipment_type(
-                happyrobot_load.get("EQUIPMENT_TYPE_NAME", "Van"), "happyrobot"
-            ),
-            "status": "available" if happyrobot_load.get("STATUS", "").upper() == "OPEN" else "unavailable",
-            "posted_carrier_rate": happyrobot_load.get("POSTED_CARRIER_RATE"),
-            "type": "owned" if happyrobot_load.get("TYPE", "").upper() == "OWNED" else "broker",
-            "is_partial": False,  # Default value
-            "origin": {
-                "city": happyrobot_load.get("ORIGIN_CITY", ""),
-                "state": happyrobot_load.get("ORIGIN_STATE_CODE", ""),
-                "zip": str(happyrobot_load.get("ORIGIN_POSTAL_CODE", "")),
-                "country": "US"
-            },
-            "destination": {
-                "city": happyrobot_load.get("DESTINATION_CITY", ""),
-                "state": happyrobot_load.get("DESTINATION_STATE_CODE", ""),
-                "zip": str(happyrobot_load.get("DESTINATION_POSTAL_CODE", "")),
-                "country": "US"
-            },
-            "stops": stops,
-            "max_buy": happyrobot_load.get("MAX_BUY"),
-            "sale_notes": None,
-            "commodity_type": happyrobot_load.get("COMMODITY_TYPE", ""),
-            "weight": happyrobot_load.get("WEIGHT"),
-            "number_of_pieces": happyrobot_load.get("NUMBER_OF_PIECES"),
-            "miles": happyrobot_load.get("MILES"),
-            "dimensions": None,
-            "pickup_date_open": pickup_open,
-            "pickup_date_close": pickup_close,
-            "delivery_date_open": delivery_open,
-            "delivery_date_close": delivery_close,
-            "temp_configuration": None,
-            "min_temp": None,
-            "max_temp": None,
-            "is_temp_metric": None,
-            "cargo_value": None,
-            "is_hazmat": False,  # Default value
-            "is_owned": happyrobot_load.get("TYPE", "").upper() == "OWNED"
+            "custom_load_id": happyrobot_load.get("custom_load_id"),
+            "equipment_type_name": happyrobot_load.get("equipment_type_name", "Van"),
+            "status": "available" if happyrobot_load.get("status", "").upper() == "OPEN" else "unavailable",
+            "posted_carrier_rate": happyrobot_load.get("posted_carrier_rate"),
+            "max_buy": happyrobot_load.get("max_buy"),
+            "type": happyrobot_load.get("type", "OWNED"),
+            "weight": happyrobot_load.get("weight"),
+            "number_of_pieces": happyrobot_load.get("number_of_pieces"),
+            "miles": happyrobot_load.get("miles"),
+            "linehaul_rate": None,  # Not provided in HappyRobot data
+            "rate_per_mile": None,  # Not provided in HappyRobot data
+            "same_day_pickup": None,  # Not provided in HappyRobot data
+            "origin_appointment_local": pickup_open,
+            "origin_appointment_utc": pickup_open,  # Assuming same as local for now
+            "origin_address_1": None,  # Not provided in HappyRobot data
+            "origin_city": happyrobot_load.get("origin_city", ""),
+            "origin_state_code": happyrobot_load.get("origin_state_code", ""),
+            "origin_postal_code": str(happyrobot_load.get("origin_postal_code", "")),
+            "destination_appointment_local": delivery_open,
+            "destination_appointment_utc": delivery_open,  # Assuming same as local for now
+            "destination_address_1": None,  # Not provided in HappyRobot data
+            "destination_city": happyrobot_load.get("destination_city", ""),
+            "destination_state_code": happyrobot_load.get("destination_state_code", ""),
+            "destination_postal_code": str(happyrobot_load.get("destination_postal_code", ""))
         }
         
         return standard_load
@@ -491,6 +512,9 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
         print("No loads to upload")
         return {"message": "No loads provided"}
 
+    # Normalize all field names to lowercase
+    happyrobot_loads = normalize_field_names(happyrobot_loads)
+    
     # Transform loads from HappyRobot format to expected format
     transformed_loads = []
     for load in happyrobot_loads:
@@ -498,7 +522,7 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
             transformed_load = map_pepsi_to_happyrobot(load)
             transformed_loads.append(transformed_load)
         except Exception as e:
-            print(f"Error transforming load {load.get('CUSTOM_LOAD_ID', 'unknown')}: {e}")
+            print(f"Error transforming load {load.get('custom_load_id', 'unknown')}: {e}")
             continue
 
     if not transformed_loads:
@@ -510,8 +534,12 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
     unique_loads = []
     print("transformed_loads", transformed_loads)
 
+    
+
     for load in transformed_loads:
+        print("load", load)
         load_id = load.get("custom_load_id")
+        print("load_id", load_id)
         if load_id and load_id not in seen_load_ids:
             seen_load_ids.add(load_id)
             unique_loads.append(load)
@@ -525,6 +553,13 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
     print(
         f"Uploading {len(unique_loads)} unique loads one at a time (filtered out {len(transformed_loads) - len(unique_loads)} duplicates)"
     )
+
+    # unique loads is unique from upload
+    print("unique_loads", unique_loads)
+    unique_load_ids = [load["custom_load_id"] for load in unique_loads]
+    unique_loads_set = set(unique_load_ids)
+
+    print("unique_loads_set", unique_loads_set)
 
     # Start from the beginning since this is a new file
     start_index = 0
@@ -554,61 +589,56 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
 
         existing_loads = (
             supabase.table("loads")
-            .select("id,custom_load_id")
-            .gte("pickup_date_close", today_start)
+            .select("custom_load_id")
+            # .gte("origin_appointment_local", today_start)
             .eq("status", "available")
-            .eq("org_id", os.getenv("ORG_ID"))
             .execute()
         )
+
 
         # Create a set of existing load IDs for quick lookup
         existing_load_ids = {load["custom_load_id"] for load in existing_loads.data}
         print("existing_load_ids", existing_load_ids)
-        print("unique_loads", unique_loads)
-        unique_load_ids = [load["custom_load_id"] for load in unique_loads]
-        unique_loads_set = set(unique_load_ids)
+        print(existing_loads.data)
 
-        print("unique_loads_set", unique_loads_set)
 
         loads_to_update = existing_load_ids - unique_loads_set
         print("loads_to_update", loads_to_update)
         print(f"Loads present in DB but not in CSV: {loads_to_update}")
         if loads_to_update and loads_to_update != set():
-            # Update status to "covered" for loads not in current response
+            # Update status to "unavailable" for loads not in current response
             update_result = (
                 supabase.table("loads")
                 .update({"status": "unavailable"})
                 .in_("custom_load_id", list(loads_to_update))
-                .eq("org_id", os.getenv("ORG_ID"))
                 .execute()
             )
             print(f"Updated {len(loads_to_update)} loads to unavailable status")
 
-        # upsert
-        
-        batch_size = 50
+        # upsert loads one by one since we don't have the upsert_loads function
         successful_uploads = 0
         failed_uploads = 0
 
-        for i in range(0, len(unique_loads), batch_size):
-            batch = unique_loads[i : i + batch_size]
-            batch_num = (i // batch_size) + 1
-            total_batches = (len(unique_loads) + batch_size - 1) // batch_size
-
+        for load in unique_loads:
             try:
-                print(
-                    f"Uploading batch {batch_num}/{total_batches} ({len(batch)} loads)"
-                )
-                result = supabase.rpc("upsert_loads", {"_payload": batch}).execute()
-                successful_uploads += len(batch)
-                print(f"Successfully uploaded batch {batch_num}")
+                print(f"Uploading load {load['custom_load_id']}")
+                
+                # Try to insert first
+                result = supabase.table("loads").insert(load).execute()
+                successful_uploads += 1
+                print(f"Successfully inserted load {load['custom_load_id']}")
 
             except Exception as e:
-                failed_uploads += len(batch)
-                print(f"Error uploading batch {batch_num}: {str(e)}")
-                # print(result)
-                # Continue with next batch instead of failing completely
-                continue
+                # If insert fails, try to update
+                try:
+                    print(f"Insert failed for {load['custom_load_id']}, trying update: {str(e)}")
+                    result = supabase.table("loads").update(load).eq("custom_load_id", load['custom_load_id']).execute()
+                    successful_uploads += 1
+                    print(f"Successfully updated load {load['custom_load_id']}")
+                except Exception as update_error:
+                    failed_uploads += 1
+                    print(f"Error uploading load {load['custom_load_id']}: {str(update_error)}")
+                    continue
 
         print(
             f"Upload complete: {successful_uploads} successful, {failed_uploads} failed"
@@ -617,8 +647,8 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
         return {
             "statusCode": 200,
             "body": json.dumps(
-                f"Successfully processed {len(unique_loads)} loads"
-                f"Successfully marked {len(loads_to_update)} loads as unavailable"
+                f"Successfully processed {successful_uploads} loads, {failed_uploads} failed. "
+                f"Marked {len(loads_to_update)} loads as unavailable"
             ),
         }
 
