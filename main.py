@@ -107,30 +107,6 @@ class HealthResponse(BaseModel):
     timestamp: str
 
 
-class FileInfo(BaseModel):
-    original_name: str
-    mimetype: str
-    size: int
-    uploaded_at: str
-
-
-class UploadResponse(BaseModel):
-    message: str
-    file: Optional[FileInfo] = None
-    files: Optional[List[FileInfo]] = None
-
-
-# Utility functions
-def validate_file_type(file: UploadFile) -> bool:
-    """Validate if file type is allowed"""
-    return file.content_type in settings.allowed_file_types
-
-
-def validate_file_size(file: UploadFile) -> bool:
-    """Validate if file size is within limits"""
-    return file.size <= settings.max_file_size
-
-
 # Routes
 @app.get("/", response_model=ServerInfo)
 async def root():
