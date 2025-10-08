@@ -445,7 +445,11 @@ def map_pepsi_to_happyrobot(happyrobot_load):
         ]
         
         # Transform to match your table schema (lowercase field names)
+        org_id = "01970f4c-c79d-7858-8034-60a265d687e4"
+        print(f"ORG_ID from environment: {org_id}")
+        print(f"Transforming load: {happyrobot_load.get('custom_load_id')}")
         standard_load = {
+            "org_id": org_id,
             "custom_load_id": happyrobot_load.get("custom_load_id"),
             "equipment_type_name": happyrobot_load.get("equipment_type_name", "Van"),
             "status": "available" if happyrobot_load.get("status", "").upper() == "OPEN" else "unavailable",
@@ -472,6 +476,7 @@ def map_pepsi_to_happyrobot(happyrobot_load):
             "destination_postal_code": str(happyrobot_load.get("destination_postal_code", ""))
         }
         
+        print(f"Final transformed load: {standard_load}")
         return standard_load
 
     except Exception as e:
@@ -610,6 +615,7 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
             .select("custom_load_id")
             # .gte("origin_appointment_local", today_start)
             .eq("status", "available")
+            .eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4")
             .execute()
         )
 
@@ -629,6 +635,7 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
                 supabase.table("loads")
                 .update({"status": "unavailable"})
                 .in_("custom_load_id", list(loads_to_update))
+                .eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4")
                 .execute()
             )
             print(f"Updated {len(loads_to_update)} loads to unavailable status")
@@ -650,9 +657,11 @@ def upload_to_supabase(happyrobot_loads: List[dict]):
                 # If insert fails, try to update
                 try:
                     print(f"Insert failed for {load['custom_load_id']}, trying update: {str(e)}")
-                    result = supabase.table("loads").update(load).eq("custom_load_id", load['custom_load_id']).execute()
+                    print(f"Update data for {load['custom_load_id']}: status={load.get('status')}")
+                    result = supabase.table("loads").update(load).eq("custom_load_id", load['custom_load_id']).eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4").execute()
                     successful_uploads += 1
                     print(f"Successfully updated load {load['custom_load_id']}")
+                    print(f"Update result: {result.data}")
                 except Exception as update_error:
                     failed_uploads += 1
                     print(f"Error uploading load {load['custom_load_id']}: {str(update_error)}")
@@ -735,6 +744,7 @@ def mark_all_loads_unavailable():
             supabase.table("loads")
             .select("custom_load_id")
             .eq("status", "available")
+            .eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4")
             .execute()
         )
         print("existing_loads data=", existing_loads.data)
@@ -749,6 +759,7 @@ def mark_all_loads_unavailable():
                 supabase.table("loads")
                 .update({"status": "unavailable"})
                 .in_("custom_load_id", existing_load_ids)
+                .eq("org_id", "01970f4c-c79d-7858-8034-60a265d687e4")
                 .execute()
             )
             print(f"Updated {len(existing_load_ids)} loads to unavailable status")
